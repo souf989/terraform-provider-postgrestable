@@ -2,7 +2,6 @@ package postgresql
 
 import (
 	"context"
-	"fmt"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -75,14 +74,15 @@ func Provider() *schema.Provider {
 				ValidateFunc: validation.IntAtLeast(-1),
 			},
 		},
-		ResourcesMap:         map[string]*schema.Resource{},
+		ResourcesMap: map[string]*schema.Resource{
+			"postgrestable_table": resourcePostgreSqlTable(),
+		},
 		DataSourcesMap:       map[string]*schema.Resource{},
 		ConfigureContextFunc: providerConfigure,
 	}
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	fmt.Println("Hello World!")
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
 

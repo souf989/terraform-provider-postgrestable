@@ -16,3 +16,27 @@ provider "postgrestable" {
   password = "rds"
   sslmode  = "disable"
 }
+
+
+
+resource "postgrestable_table" "third_table" {
+  table = "lola"
+  schema = "test"
+  columns {
+    name = "first"
+    type = "varchar"
+  }
+  columns {
+    name = "second"
+    type = "varchar"
+  }
+  columns {
+    name = "third"
+    type = "varchar(10)"
+  }
+  columns {
+    name = "fourth"
+    type = "varchar(10)"
+  }
+
+}
