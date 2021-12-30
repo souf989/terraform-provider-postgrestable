@@ -1,0 +1,26 @@
+version: '2.1'
+
+services:
+  db:
+    image: postgres
+    restart: always
+    networks:
+      - rds-network
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: rds
+      POSTGRES_PASSWORD: rds
+      POSTGRES_DB: rds
+  adminer:
+    image: adminer
+    restart: always
+    networks:
+      - rds-network
+    ports:
+      - 8081:8080
+
+
+networks:
+  rds-network:
+    name: rds-network
