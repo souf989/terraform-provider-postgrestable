@@ -40,3 +40,18 @@ resource "postgrestable_table" "third_table" {
   }
 
 }
+
+resource "postgrestable_table" "first_table" {
+  table = "lola"
+  schema = "test"
+  columns {
+    name = "first"
+    type = "text"
+  }
+  columns {
+    name = "second"
+    type = "varchar"
+  }
+
+
+}

@@ -71,10 +71,98 @@ func resourcePostgreSqlTableCreate(ctx context.Context, d *schema.ResourceData, 
 }
 
 func resourcePostgreSqlTableUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+
+	db := m.(*DBConnection)
+
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
 
+	if d.HasChange("table") {
+		if err := alterTableName(db, d); err != nil {
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Error,
+				Summary:  "Error update the table name ",
+				Detail:   "Unable to update the name of the table" + err.Error(),
+			})
+			return diags
+		}
+	}
+
+	if d.HasChange("columns") {
+		if err := alterColumn(db, d); err != nil {
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Error,
+				Summary:  "Error update the table name ",
+				Detail:   "Unable to update the name of the table" + err.Error(),
+			})
+			return diags
+		}
+	}
+
 	return diags
+}
+
+func alterTableName(db *DBConnection, d *schema.ResourceData) error {
+	schemaName := d.Get("schema").(string)
+	var oldTableName, newTableName = d.GetChange("table")
+	completeOldTableName := schemaName + "." + pq.QuoteIdentifier(oldTableName.(string))
+	sql := fmt.Sprintf("ALTER TABLE %s RENAME TO %s", completeOldTableName, pq.QuoteIdentifier(newTableName.(string)))
+	if _, err := db.Exec(sql); err != nil {
+		d.Set("table", oldTableName)
+		return fmt.Errorf("Error update table name %q to %q: %w", oldTableName, newTableName, err, sql)
+	}
+	return nil
+}
+
+func alterColumn(db *DBConnection, d *schema.ResourceData) error {
+	schemaName := d.Get("schema").(string)
+	tableName := d.Get("table").(string)
+	completeOldTableName := schemaName + "." + pq.QuoteIdentifier(tableName)
+
+	var oldColumns, newColumns = d.GetChange("columns")
+	var err error
+
+	if len(oldColumns.([]interface{})) <= len(newColumns.([]interface{})) {
+		newSlice := newColumns.([]interface{})[len(oldColumns.([]interface{})):]
+		for _, newColumn := range newSlice {
+			newCol := newColumn.(map[string]interface{})
+			sql := fmt.Sprintf("ALTER TABLE %s  ADD COLUMN %q %s", completeOldTableName, newCol["name"], newCol["type"])
+			err = execute_query(db, sql)
+		}
+	}
+
+	if len(oldColumns.([]interface{})) > len(newColumns.([]interface{})) {
+		newSlice := oldColumns.([]interface{})[len(newColumns.([]interface{})):]
+		for _, newColumn := range newSlice {
+			newCol := newColumn.(map[string]interface{})
+			sql := fmt.Sprintf("ALTER TABLE %s  DROP COLUMN %q RESTRICT", completeOldTableName, newCol["name"])
+			err = execute_query(db, sql)
+		}
+	}
+
+	for i, newColumn := range newColumns.([]interface{}) {
+		newCol := newColumn.(map[string]interface{})
+		if i <= len(oldColumns.([]interface{}))-1 {
+			oldCol := oldColumns.([]interface{})[i].(map[string]interface{})
+			if newCol["name"] != oldCol["name"] {
+				sql := fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %q TO %q", completeOldTableName, oldCol["name"], newCol["name"])
+				err = execute_query(db, sql)
+			}
+			if newCol["type"] != oldCol["type"] {
+				sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q TYPE %s", completeOldTableName, newCol["name"], newCol["type"])
+				err = execute_query(db, sql)
+			}
+		}
+	}
+
+	return err
+}
+
+func execute_query(db *DBConnection, sql string) error {
+	if _, err := db.Exec(sql); err != nil {
+		return fmt.Errorf("Error running sql query  %q: %w", err, sql)
+	}
+	return nil
 }
 
 func createTable(db *DBConnection, d *schema.ResourceData) error {
@@ -116,10 +204,7 @@ func resourcePostgreSqlTableRead(ctx context.Context, d *schema.ResourceData, m 
 func resourcePostgreSqlTableDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
-	// d.SetId("") is automatically called assuming delete returns no errors, but
-	// it is added here for explicitness.
 	d.SetId("")
-
 	return diags
 
 }
