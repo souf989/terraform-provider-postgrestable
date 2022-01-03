@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/lib/pq"
+	"regexp"
 )
 
 func resourcePostgreSqlTable() *schema.Resource {
@@ -37,8 +39,9 @@ func resourcePostgreSqlTable() *schema.Resource {
 							Required: true,
 						},
 						"type": &schema.Schema{
-							Type:     schema.TypeString,
-							Required: true,
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringMatch(regexp.MustCompile("^[a-z]+$"), "Use only alphabetical characters"),
 						},
 					},
 				},
@@ -99,7 +102,7 @@ func resourcePostgreSqlTableUpdate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
-	return diags
+	return resourcePostgreSqlTableRead(ctx, d, m)
 }
 
 func alterTableName(db *DBConnection, d *schema.ResourceData) error {
@@ -149,7 +152,7 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 				err = execute_query(db, sql)
 			}
 			if newCol["type"] != oldCol["type"] {
-				sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q TYPE %s", completeOldTableName, newCol["name"], newCol["type"])
+				sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q TYPE %s USING (%q::%s)", completeOldTableName, newCol["name"], newCol["type"], newCol["name"], newCol["type"])
 				err = execute_query(db, sql)
 			}
 		}
@@ -198,7 +201,7 @@ func createTable(db *DBConnection, d *schema.ResourceData) error {
 
 func resourcePostgreSqlTableRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	db := m.(*DBConnection)
-	return getTableColumnsDefintion(db, d)
+	return getTableColumnsDefinition(db, d)
 }
 
 func resourcePostgreSqlTableDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -209,7 +212,7 @@ func resourcePostgreSqlTableDelete(ctx context.Context, d *schema.ResourceData, 
 
 }
 
-func getTableColumnsDefintion(db *DBConnection, d *schema.ResourceData) diag.Diagnostics {
+func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Diagnostics {
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
 

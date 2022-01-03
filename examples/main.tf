@@ -17,41 +17,36 @@ provider "postgrestable" {
   sslmode  = "disable"
 }
 
-
-
-resource "postgrestable_table" "third_table" {
-  table = "lola"
-  schema = "test"
-  columns {
-    name = "first"
-    type = "varchar"
-  }
-  columns {
-    name = "second"
-    type = "varchar"
-  }
-  columns {
-    name = "third"
-    type = "varchar(10)"
-  }
-  columns {
-    name = "fourth"
-    type = "varchar(10)"
-  }
-
-}
-
 resource "postgrestable_table" "first_table" {
-  table = "lola"
-  schema = "test"
+  table = "t_lien_affaire_responsable"
+  schema = "public"
   columns {
-    name = "first"
-    type = "text"
-  }
-  columns {
-    name = "second"
+    name = "dk_code_affaire"
     type = "varchar"
   }
-
+  columns {
+    name = "dk_code_responsable"
+    type = "varchar"
+  }
+  columns {
+    name = "date_debut"
+    type = "varchar"
+  }
+  columns {
+    name = "date_fin"
+    type = "varchar"
+  }
+  columns {
+    name = "id_editeur"
+    type = "numeric"
+  }
+  columns {
+    name = "ref_traitement"
+    type = "varchar"
+  }
+  columns {
+    name = "date_traitement"
+    type = "timestamp"
+  }
 
 }
