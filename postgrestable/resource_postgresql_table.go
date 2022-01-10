@@ -31,7 +31,7 @@ func resourcePostgreSqlTable() *schema.Resource {
 			"columns": &schema.Schema{
 				Type:        schema.TypeList,
 				Required:    true,
-				Description: "The Column list defintions",
+				Description: "The Column list definitions",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": &schema.Schema{
@@ -112,7 +112,7 @@ func alterTableName(db *DBConnection, d *schema.ResourceData) error {
 	sql := fmt.Sprintf("ALTER TABLE %s RENAME TO %s", completeOldTableName, pq.QuoteIdentifier(newTableName.(string)))
 	if _, err := db.Exec(sql); err != nil {
 		d.Set("table", oldTableName)
-		return fmt.Errorf("Error update table name %q to %q: %w", oldTableName, newTableName, err, sql)
+		return fmt.Errorf("Error update table name %q to %q: %w ", oldTableName, newTableName, err)
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 		for _, newColumn := range newSlice {
 			newCol := newColumn.(map[string]interface{})
 			sql := fmt.Sprintf("ALTER TABLE %s  ADD COLUMN %q %s", completeOldTableName, newCol["name"], newCol["type"])
-			err = execute_query(db, sql)
+			err = executeQuery(db, sql)
 		}
 	}
 
@@ -139,7 +139,7 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 		for _, newColumn := range newSlice {
 			newCol := newColumn.(map[string]interface{})
 			sql := fmt.Sprintf("ALTER TABLE %s  DROP COLUMN %q RESTRICT", completeOldTableName, newCol["name"])
-			err = execute_query(db, sql)
+			err = executeQuery(db, sql)
 		}
 	}
 
@@ -149,11 +149,11 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 			oldCol := oldColumns.([]interface{})[i].(map[string]interface{})
 			if newCol["name"] != oldCol["name"] {
 				sql := fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %q TO %q", completeOldTableName, oldCol["name"], newCol["name"])
-				err = execute_query(db, sql)
+				err = executeQuery(db, sql)
 			}
 			if newCol["type"] != oldCol["type"] {
 				sql := fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %q TYPE %s USING (%q::%s)", completeOldTableName, newCol["name"], newCol["type"], newCol["name"], newCol["type"])
-				err = execute_query(db, sql)
+				err = executeQuery(db, sql)
 			}
 		}
 	}
@@ -161,9 +161,9 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 	return err
 }
 
-func execute_query(db *DBConnection, sql string) error {
+func executeQuery(db *DBConnection, sql string) error {
 	if _, err := db.Exec(sql); err != nil {
-		return fmt.Errorf("Error running sql query  %q: %w", err, sql)
+		return fmt.Errorf("Error running sql query  %q: %s", err, sql)
 	}
 	return nil
 }
@@ -191,7 +191,7 @@ func createTable(db *DBConnection, d *schema.ResourceData) error {
 	sql := b.String()
 
 	if _, err := db.Exec(sql); err != nil {
-		return fmt.Errorf("Error creating table %q: %w", tableName, err, sql)
+		return fmt.Errorf("Error creating table %q: %w", tableName, err)
 	}
 
 	var err error
@@ -230,9 +230,9 @@ func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Di
 
 	var columns []map[string]interface{}
 
-	var name, column_type string
+	var name, columnType string
 	for rows.Next() {
-		if err := rows.Scan(&name, &column_type); err != nil {
+		if err := rows.Scan(&name, &columnType); err != nil {
 			diags = append(diags, diag.Diagnostic{
 				Severity: diag.Error,
 				Summary:  "Could not scan tables columns",
@@ -242,7 +242,7 @@ func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Di
 		}
 		column := make(map[string]interface{})
 		column["name"] = name
-		column["type"] = column_type
+		column["type"] = columnType
 		columns = append(columns, column)
 	}
 

@@ -37,3 +37,7 @@ format:
 .PHONY: docker
 docker:
 	docker-compose -f ops/docker-compose.yml up -d --renew-anon-volumes
+
+.PHONY: lint
+lint:
+	go fmt ./...

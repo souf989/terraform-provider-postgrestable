@@ -16,8 +16,6 @@ import (
 var (
 	dbRegistryLock sync.Mutex
 	dbRegistry     map[string]*DBConnection = make(map[string]*DBConnection, 1)
-
-	// Mapping of feature flags to versions
 )
 
 type DBConnection struct {
@@ -87,10 +85,6 @@ func (c *Config) connStr(database string) string {
 	)
 
 	return connStr
-}
-
-func (c *Config) getDatabaseUsername() string {
-	return c.Username
 }
 
 // Connect returns a copy to an sql.Open()'ed database connection wrapped in a DBConnection struct.
