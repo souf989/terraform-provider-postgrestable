@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -65,7 +66,7 @@ func resourcePostgreSqlTableCreate(ctx context.Context, d *schema.ResourceData, 
 		return diags
 	}
 
-	d.SetId(d.Get("schema").(string) + "." + d.Get("table").(string))
+	d.SetId(d.Get("schema").(string) + "." + d.Get("table").(string) + "." + uuid.New().String())
 
 	resourcePostgreSqlTableRead(ctx, d, m)
 
