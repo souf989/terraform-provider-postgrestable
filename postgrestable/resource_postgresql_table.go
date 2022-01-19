@@ -175,7 +175,7 @@ func createTable(db *DBConnection, d *schema.ResourceData) error {
 	tableName := d.Get("table").(string)
 	var completeTableName = schemaName + "." + pq.QuoteIdentifier(tableName)
 
-	b := bytes.NewBufferString("CREATE TABLE IF NOT EXISTS ")
+	b := bytes.NewBufferString("CREATE TABLE ")
 	fmt.Fprintln(b, completeTableName, " (")
 
 	columns := d.Get("columns").([]interface{})
