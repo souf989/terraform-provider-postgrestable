@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/lib/pq"
 	"regexp"
+	"strings"
 )
 
 func resourcePostgreSqlTable() *schema.Resource {
@@ -47,6 +48,9 @@ func resourcePostgreSqlTable() *schema.Resource {
 					},
 				},
 			},
+		},
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
 		},
 	}
 }
@@ -86,7 +90,7 @@ func resourcePostgreSqlTableUpdate(ctx context.Context, d *schema.ResourceData, 
 			diags = append(diags, diag.Diagnostic{
 				Severity: diag.Error,
 				Summary:  "Error update the table name ",
-				Detail:   "Unable to update the name of the table" + err.Error(),
+				Detail:   "Unable to update the name of the table " + err.Error(),
 			})
 			return diags
 		}
@@ -97,13 +101,24 @@ func resourcePostgreSqlTableUpdate(ctx context.Context, d *schema.ResourceData, 
 			diags = append(diags, diag.Diagnostic{
 				Severity: diag.Error,
 				Summary:  "Error update the table name ",
-				Detail:   "Unable to update the name of the table" + err.Error(),
+				Detail:   "Unable to update the name of the table " + err.Error(),
 			})
 			return diags
 		}
 	}
 
 	return resourcePostgreSqlTableRead(ctx, d, m)
+}
+
+func resourcePostgreSqlTableRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	db := m.(*DBConnection)
+	return getTableColumnsDefinition(db, d)
+}
+
+func resourcePostgreSqlTableDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
+	d.SetId("")
+	return diags
 }
 
 func alterTableName(db *DBConnection, d *schema.ResourceData) error {
@@ -121,13 +136,21 @@ func alterTableName(db *DBConnection, d *schema.ResourceData) error {
 func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 	schemaName := d.Get("schema").(string)
 	tableName := d.Get("table").(string)
+
 	completeOldTableName := schemaName + "." + pq.QuoteIdentifier(tableName)
 
 	var oldColumns, newColumns = d.GetChange("columns")
 	var err error
 
+	if err := checkIfDuplicateColumns(newColumns); err != nil {
+		return err
+	}
+
 	if len(oldColumns.([]interface{})) <= len(newColumns.([]interface{})) {
 		newSlice := newColumns.([]interface{})[len(oldColumns.([]interface{})):]
+		if len(getRightDiffColumns(oldColumns, newSlice)) < len(newSlice) {
+			return fmt.Errorf("There are new columns not indexed at the end of table defintion , this will corrupt columns positions , please change there positions to the end")
+		}
 		for _, newColumn := range newSlice {
 			newCol := newColumn.(map[string]interface{})
 			sql := fmt.Sprintf("ALTER TABLE %s  ADD COLUMN %q %s", completeOldTableName, newCol["name"], newCol["type"])
@@ -137,6 +160,9 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 
 	if len(oldColumns.([]interface{})) > len(newColumns.([]interface{})) {
 		newSlice := oldColumns.([]interface{})[len(newColumns.([]interface{})):]
+		if len(getRightDiffColumns(newColumns, newSlice)) < len(newSlice) {
+			return fmt.Errorf("There are columns to remove not indexed  at the end of table defintion , this will corrupt columns positions")
+		}
 		for _, newColumn := range newSlice {
 			newCol := newColumn.(map[string]interface{})
 			sql := fmt.Sprintf("ALTER TABLE %s  DROP COLUMN %q RESTRICT", completeOldTableName, newCol["name"])
@@ -158,15 +184,7 @@ func alterColumn(db *DBConnection, d *schema.ResourceData) error {
 			}
 		}
 	}
-
 	return err
-}
-
-func executeQuery(db *DBConnection, sql string) error {
-	if _, err := db.Exec(sql); err != nil {
-		return fmt.Errorf("Error running sql query  %q: %s", err, sql)
-	}
-	return nil
 }
 
 func createTable(db *DBConnection, d *schema.ResourceData) error {
@@ -200,24 +218,31 @@ func createTable(db *DBConnection, d *schema.ResourceData) error {
 	return err
 }
 
-func resourcePostgreSqlTableRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	db := m.(*DBConnection)
-	return getTableColumnsDefinition(db, d)
-}
-
-func resourcePostgreSqlTableDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
-	d.SetId("")
-	return diags
-
-}
-
 func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Diagnostics {
 	// Warning or errors can be collected in a slice type
 	var diags diag.Diagnostics
 
-	tablename := d.Get("table").(string)
+	tablename := strings.Split(d.Id(), ".")[1]
+	schemaname := strings.Split(d.Id(), ".")[0]
+
+	if err := d.Set("table", tablename); err != nil {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Error,
+			Summary:  "Error while set the tablename  from Id" + d.Id(),
+			Detail:   "Error while set the tablename  from Id" + d.Id(),
+		})
+		return diags
+	}
+
+	if err := d.Set("schema", schemaname); err != nil {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Error,
+			Summary:  "Error while set the schema  from Id" + d.Id(),
+			Detail:   "Error while set the schema from  Id" + d.Id(),
+		})
+		return diags
+	}
+
 	rows, err := db.Query("select column_name,udt_name from INFORMATION_SCHEMA.columns where table_name=$1 order by ordinal_position", tablename)
 
 	if err != nil {
@@ -230,7 +255,6 @@ func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Di
 	}
 
 	var columns []map[string]interface{}
-
 	var name, columnType string
 	for rows.Next() {
 		if err := rows.Scan(&name, &columnType); err != nil {
@@ -247,6 +271,10 @@ func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Di
 		columns = append(columns, column)
 	}
 
+	if len(columns) == 0 {
+		d.SetId("")
+	}
+
 	if err := d.Set("columns", columns); err != nil {
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Error,
@@ -255,5 +283,6 @@ func getTableColumnsDefinition(db *DBConnection, d *schema.ResourceData) diag.Di
 		})
 		return diags
 	}
+
 	return nil
 }
